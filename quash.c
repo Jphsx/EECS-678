@@ -18,6 +18,11 @@ struct pipeTask {
 	char task1[100];
 	char task2[100];
 };
+struct commandContainer {
+	char cmd[100];
+	char cmdbuffer[100];
+};
+
 //global jobs array
 struct job joblist[100];
 int globalJobCounter=0;
@@ -33,6 +38,40 @@ int containsChar(char* string, char character){
 	}
 	return -1;
 }
+struct commandContainer seperateCommand(char* command){
+	struct commandContainer comm;
+	char tempCommand1[100];
+	char tempCommand2[100];
+	int i=0;
+	for(i=0;i<strlen(command)-1;i++){
+	printf("%c command %d\n",command[i],i);	
+}
+	if(containsChar(command, ' ')!=-1){
+		//splits the command and argument into pieces
+		int spaceIndex=containsChar(command, ' ');
+		int i=0;
+		int j=0;
+		while(i<spaceIndex){
+			tempCommand1[i]=command[i];
+			i=i+1;	
+		}
+		i=spaceIndex+1;
+		while(i<strlen(command)-1){
+			printf("%s tc2",tempCommand2);
+			tempCommand2[j]=command[i];
+			i=i+1;
+			j=j+1;
+		}
+		printf("insid seperator %s is tc1 %s is tc2\n",tempCommand1,tempCommand2);
+		strcpy(comm.cmd,tempCommand1);
+		strcpy(comm.cmdbuffer,tempCommand2);
+	}
+	else{
+		strcpy(comm.cmd,command);
+		strcpy(comm.cmdbuffer," ");
+	}
+	return comm;
+}
 struct pipeTask seperatePipeTasks(char* command){
 	struct pipeTask tasks;
 	int indexOfPipebar;
@@ -42,10 +81,12 @@ struct pipeTask seperatePipeTasks(char* command){
 	int i=0;
 	while(i<indexOfPipebar-1){
 		tempTask1[i]=command[i];
+		i=i+1;
 	}
 	 i=indexOfPipebar+1;
 	while(i<strlen(command)-1){
 		tempTask2[i]=command[i];
+		i=i+1;
 	}
 	strcpy(tasks.task1,tempTask1);
 	strcpy(tasks.task2,tempTask2);
@@ -128,6 +169,8 @@ int parseEntry(char*  entry){
 	//detect exit
 	char killShelle[5];
 	char killShellq[5];
+	char jobCommand[5];
+	strcpy(jobCommand,"jobs\n");
 	strcpy(killShellq,"quit\n");
 	strcpy(killShelle,"exit\n");
 	if(strcoll(killShelle, entry)==0 || strcoll(killShellq, entry)==0){
@@ -137,21 +180,22 @@ int parseEntry(char*  entry){
 	}
 
 	// check for & to run in background
-	if(containsChar(entry,'&')!=-1){	
+	else if(containsChar(entry,'&')!=-1){	
 		runBackgroundTask(removeChar(entry,'&'));
 	}
 
 	//check for jobs to print to screen
-	char jobCommand[5];
-	strcpy(jobCommand,"jobs\n");
-	if(strcoll(jobCommand,entry)==0){
+	else if(strcoll(jobCommand,entry)==0){
 		printJobList();
 	}
 
 	//check for pipes in the command
-	if(containsChar(entry,'|')!=-1){
+	else if(containsChar(entry,'|')!=-1){
 		//only will work for 1 pipe
 		pipeLink(seperatePipeTasks(entry));
+	}
+	else{
+		executeCommand(entry);	
 	}
 
 }
@@ -187,7 +231,9 @@ void pipeLink(struct pipeTask tasks){
 	close(fd1[1]);	
 }
 void executeCommand(char* command) {
-	
+	struct commandContainer comd=seperateCommand(command);
+	//do execl stuff
+	printf("executing command %s with parameters %s \n",comd.cmd,comd.cmdbuffer);
 }
 
 int main(int argc, char **argv,char **envp)
