@@ -23,7 +23,16 @@ struct job joblist[100];
 int globalJobCounter=0;
 int programRunning=1;
 
-
+int containsChar(char* string, char character){
+	int i=0;
+	while(i<strlen(string)-1){
+		if(string[i]==character){
+			return i;
+		}
+		i=i+1;
+	}
+	return -1;
+}
 struct pipeTask seperatePipeTasks(char* command){
 	struct pipeTask tasks;
 	int indexOfPipebar;
@@ -56,17 +65,7 @@ char* removeChar(char*string, char character){
 	return string;
 }
 
-//return index if a character is in a string, and -1 if it is not
-int containsChar(char* string, char character){
-	int i=0;
-	while(i<strlen(string)-1){
-		if(string[i]==character){
-			return i;
-		}
-		i=i+1;
-	}
-	return -1;
-}
+
 //takes a task and splits off a child process to execute it
 //stores the job information in the struct job array
 //for later access
@@ -80,26 +79,31 @@ void runBackgroundTask(char* task){
 		globalJobCounter = 0;
 	}
 	// store the counter incase it is changed during execution, increment
-	int counterCopy = globalJobCounter;
-	int status;
+	int counterCopy;
+	counterCopy =  globalJobCounter;
+	
+	
 	childpid = fork();
 	struct job childJob;
-	childJob.jobFlag=1;
 
+
+	childJob.jobFlag=1;
 	if(childpid==0){
 		printf("[%d] %d running in background %s \n", counterCopy,getpid(),task);
 		//pass task back to parse for execution
-		//		dummyJob();
+			sleep(2);	
+		//	dummyJob();
 		parseEntry(task);
 		printf("[%d] %d finished in background %s \n", counterCopy,getpid(),task);
 		//	joblist[counterCopy].jobFlag=0;
+		exit(0);
 	}
 	else{
 		childJob.JOBID = counterCopy;
 		childJob.PID = childpid;
 		strcpy(childJob.COMMAND, task);
 		joblist[counterCopy] = childJob;
-		globalJobCounter++;
+		globalJobCounter=globalJobCounter+1;
 	}	
 }
 //iterates through the job stack and checks 
@@ -145,7 +149,7 @@ int parseEntry(char*  entry){
 	}
 
 	//check for pipes in the command
-	if(containsChar(entry,'|')){
+	if(containsChar(entry,'|')!=-1){
 		//only will work for 1 pipe
 		pipeLink(seperatePipeTasks(entry));
 	}
@@ -181,6 +185,9 @@ void pipeLink(struct pipeTask tasks){
 	}
 	close(fd1[0]);
 	close(fd1[1]);	
+}
+void executeCommand(char* command) {
+	
 }
 
 int main(int argc, char **argv,char **envp)
