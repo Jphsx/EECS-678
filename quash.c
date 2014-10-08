@@ -38,14 +38,13 @@ int containsChar(char* string, char character){
 	}
 	return -1;
 }
-struct commandContainer seperateCommand(char* command){
-	struct commandContainer comm;
+struct commandContainer* seperateCommand(char* command){
+	struct commandContainer* comm;
+	
+	comm = (struct commandContainer*) malloc(sizeof(comm));	
 	char tempCommand1[100];
 	char tempCommand2[100];
-	int i=0;
-	for(i=0;i<strlen(command)-1;i++){
-	printf("%c command %d\n",command[i],i);	
-}
+
 	if(containsChar(command, ' ')!=-1){
 		//splits the command and argument into pieces
 		int spaceIndex=containsChar(command, ' ');
@@ -57,18 +56,16 @@ struct commandContainer seperateCommand(char* command){
 		}
 		i=spaceIndex+1;
 		while(i<strlen(command)-1){
-			printf("%s tc2",tempCommand2);
 			tempCommand2[j]=command[i];
 			i=i+1;
 			j=j+1;
 		}
-		printf("insid seperator %s is tc1 %s is tc2\n",tempCommand1,tempCommand2);
-		strcpy(comm.cmd,tempCommand1);
-		strcpy(comm.cmdbuffer,tempCommand2);
+		strcpy(comm->cmd,tempCommand1);
+		strcpy(comm->cmdbuffer,tempCommand2);
 	}
 	else{
-		strcpy(comm.cmd,command);
-		strcpy(comm.cmdbuffer," ");
+		strcpy(comm->cmd,command);
+		strcpy(comm->cmdbuffer," ");
 	}
 	return comm;
 }
@@ -195,7 +192,7 @@ int parseEntry(char*  entry){
 		pipeLink(seperatePipeTasks(entry));
 	}
 	else{
-		executeCommand(entry);	
+		executeCommand(seperateCommand(entry));	
 	}
 
 }
@@ -230,10 +227,13 @@ void pipeLink(struct pipeTask tasks){
 	close(fd1[0]);
 	close(fd1[1]);	
 }
-void executeCommand(char* command) {
-	struct commandContainer comd=seperateCommand(command);
+void executeCommand(struct commandContainer* comm) {
+//	comm = (struct commandContainer*) malloc(sizeof(comm));	
 	//do execl stuff
-	printf("executing command %s with parameters %s \n",comd.cmd,comd.cmdbuffer);
+	printf("executing command %s with parameters %s \n",comm->cmd,comm->cmdbuffer);
+//	free(comm->cmd);
+//	free(comm->cmdbuffer);
+	free(comm);
 }
 
 int main(int argc, char **argv,char **envp)
