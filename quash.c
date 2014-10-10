@@ -21,6 +21,8 @@ struct pipeTask {
 struct commandContainer {
 	char cmd[100];
 	char cmdbuffer[100];
+//	char* cmd;
+//	char* cmdbuffer;
 };
 
 //global jobs array
@@ -28,6 +30,34 @@ struct job joblist[100];
 int globalJobCounter=0;
 int programRunning=1;
 
+void freeCommandContainer(struct commandContainer comm){
+	int i=0;
+	char nullArray[100];
+	for(i=0;i<100;i++){
+		nullArray[i]='\0';
+	}
+	strcpy(comm.cmd,nullArray);
+	strcpy(comm.cmdbuffer,nullArray);
+}
+
+void freeArray(char* array){
+	int i=0;
+	char nullArray[100];
+	for(i=0;i<100;i++){
+		nullArray[i]='\0';
+	}
+	strcpy(array,nullArray);
+}	
+
+void freePipeTask(struct pipeTask ptask){
+	int i=0;
+	char nullArray[100];
+	for(i=0;i<100;i++){
+		nullArray[i]='\0';
+	}
+	strcpy(ptask.task1,nullArray);
+	strcpy(ptask.task2,nullArray);
+}
 int containsChar(char* string, char character){
 	int i=0;
 	while(i<strlen(string)-1){
@@ -38,12 +68,19 @@ int containsChar(char* string, char character){
 	}
 	return -1;
 }
-struct commandContainer* seperateCommand(char* command){
-	struct commandContainer* comm;
-	
-	comm = (struct commandContainer*) malloc(sizeof(comm));	
+struct commandContainer seperateCommand(char* command){
+//	struct commandContainer* comm;
+	struct commandContainer comm;
+	freeCommandContainer(comm);	
+//	comm = (struct commandContainer*) malloc(strlen(command));	
+//	comm.cmd=malloc(containsChar(command,' ')+1);
+//	comm.cmdbuffer=malloc(strlen(command)-containsChar(command,' ')-1);
 	char tempCommand1[100];
 	char tempCommand2[100];
+	freeArray(tempCommand1);
+	freeArray(tempCommand2);
+//	char *tempCommand1;
+//	char *tempCommand2;
 
 	if(containsChar(command, ' ')!=-1){
 		//splits the command and argument into pieces
@@ -60,30 +97,37 @@ struct commandContainer* seperateCommand(char* command){
 			i=i+1;
 			j=j+1;
 		}
-		strcpy(comm->cmd,tempCommand1);
-		strcpy(comm->cmdbuffer,tempCommand2);
+		strcpy(comm.cmd,tempCommand1);
+		strcpy(comm.cmdbuffer,tempCommand2);
 	}
 	else{
-		strcpy(comm->cmd,command);
-		strcpy(comm->cmdbuffer," ");
+		strcpy(comm.cmd,command);
+		strcpy(comm.cmdbuffer," ");
 	}
 	return comm;
 }
 struct pipeTask seperatePipeTasks(char* command){
+//	struct pipeTask* tasks;
+//	tasks = (struct pipeTask*) malloc(sizeof(command));
 	struct pipeTask tasks;
+	freePipeTask(tasks);
 	int indexOfPipebar;
 	indexOfPipebar=containsChar(command,'|');
 	char tempTask1[100],tempTask2[100];
+	freeArray(tempTask1);
+	freeArray(tempTask2);
 	//pull out first task to temp array
 	int i=0;
-	while(i<indexOfPipebar-1){
+	int j=0;
+	while(i<indexOfPipebar){
 		tempTask1[i]=command[i];
 		i=i+1;
 	}
 	 i=indexOfPipebar+1;
 	while(i<strlen(command)-1){
-		tempTask2[i]=command[i];
+		tempTask2[j]=command[i];
 		i=i+1;
+		j=j+1;
 	}
 	strcpy(tasks.task1,tempTask1);
 	strcpy(tasks.task2,tempTask2);
@@ -129,7 +173,7 @@ void runBackgroundTask(char* task){
 	if(childpid==0){
 		printf("[%d] %d running in background %s \n", counterCopy,getpid(),task);
 		//pass task back to parse for execution
-			sleep(2);	
+			sleep(1);	
 		//	dummyJob();
 		parseEntry(task);
 		printf("[%d] %d finished in background %s \n", counterCopy,getpid(),task);
@@ -151,7 +195,12 @@ void printJobList(){
 	int i=0;
 	while( i<99) {
 		if(joblist[i].jobFlag == 1){
+		//	if(execl(PATH,ps,"-p",joblist[i].PID,(char*)0)>0){
 			printf("[%d] %d running in background %s \n",joblist[i].JOBID,joblist[i].PID,joblist[i].COMMAND);
+		//	}
+		//	else{
+		//		joblist[i].jobFlag=0;
+		//	}
 		}
 		i=i+1;
 	}
@@ -227,13 +276,15 @@ void pipeLink(struct pipeTask tasks){
 	close(fd1[0]);
 	close(fd1[1]);	
 }
-void executeCommand(struct commandContainer* comm) {
+void executeCommand(struct commandContainer comm) {
 //	comm = (struct commandContainer*) malloc(sizeof(comm));	
 	//do execl stuff
-	printf("executing command %s with parameters %s \n",comm->cmd,comm->cmdbuffer);
-//	free(comm->cmd);
-//	free(comm->cmdbuffer);
-	free(comm);
+	printf("executing command %s with parameters %s \n",comm.cmd,comm.cmdbuffer);
+	//execl(PATH,comm.cmd,comm.cmdbuffer,(char*)0);
+//	free(comm.cmd);
+//	free(comm.cmdbuffer);
+//	free(comm);
+	freeCommandContainer(comm);
 }
 
 int main(int argc, char **argv,char **envp)
