@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 struct job {
 	//job flag is 1 for process in progress, 0 for finished
@@ -14,34 +15,23 @@ struct job {
 	int PID;
 	char COMMAND[100];
 };
-struct pipeTask {
-	char task1[100];
-	char task2[100];
-};
+
 //global jobs array
 struct job joblist[100];
 int globalJobCounter=0;
 int programRunning=1;
+char cwd[1024];
 
 
-struct pipeTask seperatePipeTasks(char* command){
-	struct pipeTask tasks;
-	int indexOfPipebar;
-	indexOfPipebar=containsChar(command,'|');
-	char tempTask1[100],tempTask2[100];
-	//pull out first task to temp array
+int containsChar(char* string, char character){
 	int i=0;
-	while(i<indexOfPipebar-1){
-		tempTask1[i]=command[i];
+	while(i<strlen(string)-1){
+		if(string[i]==character){
+			return i;
+		}
+		i=i+1;
 	}
-	 i=indexOfPipebar+1;
-	while(i<strlen(command)-1){
-		tempTask2[i]=command[i];
-	}
-	strcpy(tasks.task1,tempTask1);
-	strcpy(tasks.task2,tempTask2);
-	return tasks;	
-
+	return -1;
 }
 
 char* removeChar(char*string, char character){
@@ -56,17 +46,7 @@ char* removeChar(char*string, char character){
 	return string;
 }
 
-//return index if a character is in a string, and -1 if it is not
-int containsChar(char* string, char character){
-	int i=0;
-	while(i<strlen(string)-1){
-		if(string[i]==character){
-			return i;
-		}
-		i=i+1;
-	}
-	return -1;
-}
+
 //takes a task and splits off a child process to execute it
 //stores the job information in the struct job array
 //for later access
@@ -80,118 +60,266 @@ void runBackgroundTask(char* task){
 		globalJobCounter = 0;
 	}
 	// store the counter incase it is changed during execution, increment
-	int counterCopy = globalJobCounter;
-	int status;
+	int counterCopy;
+	counterCopy =  globalJobCounter;
+	
 	childpid = fork();
 	struct job childJob;
-	childJob.jobFlag=1;
 
+	childJob.jobFlag=1;
 	if(childpid==0){
 		printf("[%d] %d running in background %s \n", counterCopy,getpid(),task);
 		//pass task back to parse for execution
-		//		dummyJob();
+			sleep(1);	
+		//	dummyJob();
 		parseEntry(task);
 		printf("[%d] %d finished in background %s \n", counterCopy,getpid(),task);
 		//	joblist[counterCopy].jobFlag=0;
+		exit(0);
 	}
 	else{
 		childJob.JOBID = counterCopy;
 		childJob.PID = childpid;
 		strcpy(childJob.COMMAND, task);
 		joblist[counterCopy] = childJob;
-		globalJobCounter++;
+		globalJobCounter=globalJobCounter+1;
 	}	
 }
 //iterates through the job stack and checks 
 //for any job in progress flag then prints
 //out all the information for each background job
 void printJobList(){
-	int i=0;
-	while( i<99) {
-		if(joblist[i].jobFlag == 1){
-			printf("[%d] %d running in background %s \n",joblist[i].JOBID,joblist[i].PID,joblist[i].COMMAND);
+    int i=0;
+    while( i<99) {
+        if(joblist[i].jobFlag == 1){
+		if(kill(joblist[i].PID,0)==0){
+   		         printf("[%d] %d running in background %s \n",joblist[i].JOBID,joblist[i].PID,joblist[i].COMMAND);
 		}
-		i=i+1;
-	}
+		else{
+			joblist[i].jobFlag=0;
+		}
+        }
+        i=i+1;
+    }
 
 }
+
 void dummyJob(){
 	int k=5;
 	while(k==6){};
 }
 
+void set(char* entry){
+int ret;
+int check;
+char *args2=NULL;
+
+	if(entry==NULL){
+	}else if (strstr(entry, "HOME") != NULL){
+		printf("No args\n");
+		entry[strlen(entry) - 1] = '\0';
+		args2 = strstr(entry, "=");
+		args2 = args2 + 1;
+		check = setenv("HOME",args2,1);
+		printf("set HOME to:%s\ncheck:%i\n",args2,check);
+	}else if (strstr(entry, "PATH") != NULL){
+		entry[strlen(entry) - 1] = '\0';
+		args2 = strstr(entry, "=");
+		args2 = args2 + 1;
+		printf("set PATH to:%s\n",args2);
+		setenv("PATH",args2,1);
+	}
+}
+
+void cd(char* entry){
+int ret;
+int check;
+int test;
+
+	if(entry==NULL){
+		ret = chdir(getenv("HOME"));
+	}else{
+		entry[strlen(entry) - 1] = '\0';
+		printf("change to directory:%s\n",entry);
+		ret = chdir(entry);
+		test =strcoll("test", entry);
+		printf("ret:%i\ntest:%i\n",ret,test);
+	}
+}
+
+void stdoutTofile(char *filename){
+	FILE *outfile;
+	outfile = freopen(filename, "w", stdout);
+}
+
+void stdoutToscreen(){
+	freopen ("/dev/tty", "a", stdout);
+}
+
+void executeCommand(char *command, char* cmdbuffer, char* outFile) {
+	pid_t execProcess;
+	FILE *outfile;
+	execProcess=fork();
+	
+	if(outFile!=NULL)
+	outfile = freopen(outFile, "w", stdout);
+	
+	if(execProcess==0){	  
+	 printf("executing command %s with parameters %s \n",command,cmdbuffer);
+	
+	if(cmdbuffer != NULL && outFile==NULL){	
+		if(cmdbuffer[strlen(cmdbuffer)-1]=='\n'){
+		cmdbuffer[strlen(cmdbuffer)-1]=NULL;
+		}
+		execlp(command,command,cmdbuffer,(char*)0);
+	}
+	else{
+		if(command[strlen(command)-1]=='\n'){
+		command[strlen(command)-1]=NULL;
+		}
+		execlp(command,command,(char*)0);
+		
+		//close(outfile);
+	}
+	}
+}
+
 int parseEntry(char*  entry){
 	//detect exit
-	char killShelle[5];
-	char killShellq[5];
-	strcpy(killShellq,"quit\n");
-	strcpy(killShelle,"exit\n");
-	if(strcoll(killShelle, entry)==0 || strcoll(killShellq, entry)==0){
+	char *command = NULL;
+	char *args = NULL;
+	char *entrydup = NULL;
+	char* argsChopped = NULL;
+	char* outFile = NULL;
+			
+	if(strstr(entry, " > ")!=NULL){
+	outFile = strstr(entry, " > ");
+	outFile = outFile+3;
+	printf("%s\n",outFile);
+		if(outFile[strlen(outFile)-1]=='\n'){
+		outFile[strlen(outFile)-1]=NULL;
+	}
+	}
+	
+	if((strstr(entry, "quit") != NULL) || (strstr(entry, "exit") != NULL)){
 		programRunning=0;
 		printf("\n");
 		exit(0);
 	}
 
 	// check for & to run in background
-	if(containsChar(entry,'&')!=-1){	
+	else if(containsChar(entry,'&')!=-1){	
 		runBackgroundTask(removeChar(entry,'&'));
 	}
-
+	//check for pipes in the command
+   	 else if(containsChar(entry,'|')!=-1){
+        //only will work for 1 pipe
+ 		entrydup = strdup(entry);
+        	command = strtok(entry, "|");
+                        args = strstr(entrydup, "|");
+               	pipeLink(command,args);
+	
+    	}
 	//check for jobs to print to screen
-	char jobCommand[5];
-	strcpy(jobCommand,"jobs\n");
-	if(strcoll(jobCommand,entry)==0){
+	else if((strstr(entry, "jobs") != NULL)){
 		printJobList();
 	}
 
-	//check for pipes in the command
-	if(containsChar(entry,'|')){
-		//only will work for 1 pipe
-		pipeLink(seperatePipeTasks(entry));
+	else if(strstr(entry, "set") != NULL){
+		entrydup = strdup(entry);
+		command = strtok(entry, " ");
+		//args = strtok(entry, " ");
+		//printf("%s\n",command);
+		//printf("%s\n",args);
+			if(strstr(entrydup, " ")!=NULL){
+				args = strstr(entrydup, " ");
+				argsChopped = args + 1;
+			}
+		//printf("%s\n",args);
+		set(argsChopped);
 	}
+	
+	else if(strstr(entry, "cd") != NULL){
+		entrydup = strdup(entry);
+		command = strtok(entry, " ");
+		//args = strtok(entry, " ");
+		//printf("%s\n",command);
+		//printf("%s\n",args);
+			if(strstr(entrydup, " ")!=NULL){
+				args = strstr(entrydup, " ");
+				argsChopped = args + 1;
+			}
+		//printf("%s\n",args);
+		cd(argsChopped);
+	}	
+
+
+    else{
+        entrydup = strdup(entry);
+        command = strtok(entry, " ");
+        if(strstr(entrydup," ")!=NULL){
+        args = strstr(entrydup, " ");
+		argsChopped=args+1;
+		
+		executeCommand(command,argsChopped,outFile);
+	
+	}
+	else{
+		args=NULL;
+		executeCommand(command,args,outFile);
+	}
+	
+        //executeCommand(command,args);   
+    }
 
 }
-void pipeLink(struct pipeTask tasks){
-	pid_t pid1,pid2;
-	int status, fd1[2];
-	//set up pipes
-	pipe(fd1);
 
-	pid1 = fork();
-	if (pid1 == 0) {
-		dup2(fd1[1],1);
-		close(fd1[0]);
-		close(fd1[1]);
+void pipeLink(char* input1,char* input2){
+    pid_t pid1,pid2;
+    int status, fd1[2];
+    //set up pipes
+    pipe(fd1);
 
-		//send task to parse which will then call execute
-		//this is because we might want to pipe with 
-		//a special command like 'jobs'
-		parseEntry(tasks.task1);
-		exit(0);
-	}
+    pid1 = fork();
+    if (pid1 == 0) {
+        dup2(fd1[1],1);
+        close(fd1[0]);
+        close(fd1[1]);
 
-	pid2 = fork();
-	if(pid2 == 0) {
-		dup2(fd1[0],0);
-		close(fd1[0]);
-		close(fd1[1]);
+        //send task to parse which will then call execute
+        //this is because we might want to pipe with
+        //a special command like 'jobs'
+        parseEntry(input1);
+        exit(0);
+    }
 
-		parseEntry(tasks.task2);
-		exit(0);
-	}
-	close(fd1[0]);
-	close(fd1[1]);	
+    pid2 = fork();
+    if(pid2 == 0) {
+        dup2(fd1[0],0);
+        close(fd1[0]);
+        close(fd1[1]);
+
+        parseEntry(input2);
+        exit(0);
+    }
+    close(fd1[0]);
+    close(fd1[1]);   
 }
+
+
 
 int main(int argc, char **argv,char **envp)
 {
 char entry[100];
-  
 	//spin at prompt, only parse on input 
 	while(programRunning){
-		printf(">");
+		freopen ("/dev/tty", "a", stdout);
+	    printf("PATH=%s\n",getenv("PATH"));
+		printf("HOME=%s\n",getenv("HOME"));
+		printf("JOBS RUNNING=%i\n",globalJobCounter);
+		printf("%s>", getcwd(cwd, sizeof(cwd)));
 		fgets(entry,100,stdin);
-	   	 parseEntry(entry);
+	   	parseEntry(removeChar(entry, '\n'));	
 		
 	}
 }
